@@ -6,10 +6,27 @@ Terraform root for Proxmox VMs. Uses the sibling module:
 source = "../../terraform-proxmox-vm-module"
 ```
 
-Published module (optional, instead of local path):
+Module source (pinned for CI):
 
-- https://github.com/VeselijDrozd/terraform-proxmox-vm-module
-- example: `source = "git::https://github.com/VeselijDrozd/terraform-proxmox-vm-module.git?ref=v1.1.2"`
+```hcl
+source = "git::https://github.com/VeselijDrozd/terraform-proxmox-vm-module.git?ref=v1.1.2"
+```
+
+Local sibling checkout still works if you temporarily switch `source` to `../../terraform-proxmox-vm-module`.
+
+## Remote state (GitLab)
+
+Default backend is GitLab Managed Terraform State (`backend "http"`). See root [`README.md`](../README.md) for migrate + CI variables.
+
+Local helper:
+
+```bash
+cp gitlab_http_backend_cred.sh.example gitlab_http_backend_cred.sh
+source ./gitlab_http_backend_cred.sh
+terraform init -migrate-state   # first time from local backend
+```
+
+Optional MinIO/S3 credentials template remains in `s3_backend_cred.sh.example` if you prefer an S3-compatible backend later.
 
 ## Что делает проект
 

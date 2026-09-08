@@ -1,0 +1,41 @@
+# Example shape of the GitLab CI/CD File variable TF_VARS_FILE.
+# Copy from your real terraform.tfvars and adjust paths for the runner.
+#
+# Required CI File variables:
+#   TF_VARS_FILE      → this content
+#   SSH_PUBLIC_KEY    → public key material (written to /tmp/tf-ci-keys/id.pub)
+#   SSH_PRIVATE_KEY   → private key (optional unless images use local_path uploads)
+
+endpoint         = "https://192.168.1.100:8006"
+proxmox_username = "root@pam"
+main_password    = "CHANGE_ME_PROXMOX_PASSWORD"
+vm_pass          = "CHANGE_ME_VM_PASSWORD"
+
+# Paths must match terraform/ci/setup.sh
+pc_public_key_path           = "/tmp/tf-ci-keys/id.pub"
+proxmox_ssh_private_key_path = "/tmp/tf-ci-keys/id"
+proxmox_ssh_username         = "root"
+
+ansible_inventory_path       = "../ansible/inventory.ini"
+ansible_ssh_private_key_file = "/tmp/tf-ci-keys/id"
+
+ansible_inventory_hierarchy = {
+  homelab = ["k8s", "gitlab"]
+  k8s     = ["k8s_master", "k8s_worker"]
+  gitlab  = ["gitlab_server", "gitlab_runner"]
+}
+
+# Prefer url= in CI so the runner does not need a local cloud image file.
+# If you keep local_path=, the image must exist on the runner at that path.
+images = {
+  ubuntu_jammy = {
+    datastore_id = "local"
+    node_name    = "pve"
+    url          = "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
+    file_name    = "jammy-server-cloudimg-amd64.qcow2"
+  }
+}
+
+# Paste your real vm_groups / vms from terraform.tfvars below.
+vm_groups = {}
+vms       = {}

@@ -69,8 +69,9 @@ resource "proxmox_virtual_environment_file" "images_local" {
 module "vms" {
   for_each = local.vms_expanded
 
-  # Sibling of devops/homelab — keep module as a separate reusable repo.
-  source = "../../terraform-proxmox-vm-module"
+  # Public module (works in GitLab CI). Local alternative:
+  # source = "../../terraform-proxmox-vm-module"
+  source = "git::https://github.com/VeselijDrozd/terraform-proxmox-vm-module.git?ref=v1.1.2"
 
   image_id       = local.image_volume_ids[each.value.image_key]
   ssh_public_key = trimspace(file(var.pc_public_key_path))

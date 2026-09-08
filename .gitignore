@@ -9,13 +9,15 @@
 *.auto.tfvars.json
 s3_*cred*.sh
 !s3_*cred*.sh.example
+**/gitlab_http_backend_cred.sh
+!**/gitlab_http_backend_cred.sh.example
 .env
 .env.*
 !.env.example
 
 # --- Terraform ---
 **/.terraform/
-**/.terraform.lock.hcl
+# Commit lock files for reproducible CI (do not ignore .terraform.lock.hcl)
 *.tfstate
 *.tfstate.*
 crash.log
@@ -24,6 +26,8 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+**/tfplan
+**/tfplan.txt
 
 # --- Ansible ---
 ansible/inventory.ini
