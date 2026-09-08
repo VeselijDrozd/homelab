@@ -1,0 +1,64 @@
+---
+- name: Check if cluster is already initialized
+  ansible.builtin.stat:
+    path: /etc/kubernetes/admin.conf
+  register: k8s_admin_conf
+
+- name: Initialize Kubernetes control plane
+  ansible.builtin.command:
+    cmd: >-
+      kubeadm init
+      --apiserver-advertise-address={{ ansible_default_ipv4.address }}
+      --pod-network-cidr={{ pod_network_cidr }}
+      {{ kubeadm_init_opts }}
+    creates: /etc/kubernetes/admin.conf
+  when: not k8s_admin_conf.stat.exists
+  register: kubeadm_init
+
+- name: Show kubeadm init output
+  ansible.builtin.debug:
+    var: kubeadm_init.stdout_lines
+  when: kubeadm_init is changed
+
+- name: Create .kube directory for ubuntu user
+  ansible.builtin.file:
+    path: /home/ubuntu/.kube
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: "0755"
+
+- name: Copy admin kubeconfig for ubuntu user
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /home/ubuntu/.kube/config
+    remote_src: true
+    owner: ubuntu
+    group: ubuntu
+    mode: "0600"
+
+- name: Install Flannel CNI
+  ansible.builtin.command:
+    cmd: kubectl apply -f {{ flannel_manifest_url }}
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: flannel_apply
+  changed_when: "'created' in flannel_apply.stdout or 'configured' in flannel_apply.stdout"
+  failed_when: flannel_apply.rc != 0
+
+- name: Wait for control plane node to be Ready
+  ansible.builtin.command:
+    cmd: kubectl wait --for=condition=Ready node --all --timeout=300s
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  changed_when: false
+
+- name: Generate worker join command
+  ansible.builtin.command:
+    cmd: kubeadm token create --print-join-command
+  register: kubeadm_join_command_raw
+  changed_when: false
+
+- name: Store join command for worker nodes
+  ansible.builtin.set_fact:
+    kubernetes_join_command: "{{ kubeadm_join_command_raw.stdout | trim }}"

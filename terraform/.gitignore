@@ -1,0 +1,33 @@
+# Terraform local files
+.terraform/
+# Keep .terraform.lock.hcl tracked for CI reproducibility
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+tfplan
+tfplan.txt
+
+# Terraform variable files (can contain secrets)
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+!*.tfvars.ci.example
+
+# Generated Ansible inventory
+inventory.ini
+
+# Local CLI/config files
+*.auto.tfvars
+*.auto.tfvars.json
+
+# Sensitive project files (local only; use *.example templates)
+s3_backet_cred.sh
+s3_backend_cred.sh
+gitlab_http_backend_cred.sh
+*secrets*.yml
+!*secrets*.yml.example

@@ -1,93 +1,106 @@
-# homelab_infra
+# Homelab infrastructure
 
+IaC for a Proxmox-based home lab: VMs → Ansible inventory → Kubernetes → platform apps.
 
+Hosting:
 
-## Getting started
+| Remote | Role |
+|--------|------|
+| GitHub (`VeselijDrozd/homelab`) | public mirror / history |
+| GitLab (homelab) | **source of truth for CI** + Managed Terraform State |
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## Layout
 
 ```
-cd existing_repo
-git remote add origin http://gitlab.homelab.local/homelab/homelab.git
-git branch -M main
-git push -uf origin main
+homelab/
+├── .gitlab-ci.yml   # Terraform fmt → validate → plan → manual apply
+├── terraform/       # Proxmox VMs + remote state (GitLab HTTP backend)
+├── ansible/         # kubeadm cluster bootstrap
+├── k8s/             # manifests & Helm values (website, monitoring, …)
+└── gitlab/          # notes / related deploy experiments
 ```
 
-## Integrate with your tools
+Related repos:
 
-* [Set up project integrations](http://gitlab.homelab.local/homelab/homelab/-/settings/integrations)
+| Path | Hosting | Role |
+|------|---------|------|
+| `../terraform-proxmox-vm-module` | GitHub (public) | Reusable Terraform VM module (also pulled by git ref in CI) |
+| `../surfhouse` | GitLab (homelab) | Sample app + deploy CI |
 
-## Collaborate with your team
+## Suggested order
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+1. Prepare cloud image with qemu-guest-agent.
+2. `cd terraform && cp terraform.tfvars.example terraform.tfvars` → fill secrets → `terraform apply`.
+3. Inventory is written to `ansible/inventory.ini`.
+4. `cd ../ansible && ansible-playbook k8s-cluster.yml`.
+5. Deploy platform pieces from `k8s/` (Ingress, local-path, apps, monitoring).
 
-## Test and Deploy
+## Secrets
 
-Use the built-in continuous integration in GitLab.
+Do not commit real passwords. Use:
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+- `terraform/terraform.tfvars` (gitignored) from `terraform.tfvars.example`
+- `terraform/gitlab_http_backend_cred.sh` (gitignored) from `gitlab_http_backend_cred.sh.example`
+- `terraform/s3_backend_cred.sh` (gitignored) from `s3_backend_cred.sh.example` (optional MinIO)
+- `k8s/02-monitoring/kube-prometheus-stack-secrets.yml` (gitignored) from `*.example`
 
-***
+---
 
-# Editing this README
+## GitLab CI / remote state
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+Phases 1–2: **Managed Terraform State** + pipeline `fmt` → `validate` → `plan` → **manual** `apply`.
 
-## Suggestions for a good README
+### 1. Create GitLab project
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+Create an empty project (e.g. `homelab/homelab` or `homelab/infra`). Note the numeric **Project ID**.
 
-## Name
-Choose a self-explaining name for your project.
+Add GitLab remote (keep GitHub if you want):
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+```bash
+cd /path/to/homelab
+git remote add gitlab git@gitlab.homelab.local:GROUP/homelab.git
+# first push after commit:
+git push -u gitlab master
+```
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+### 2. Migrate local state → GitLab (once, from your laptop)
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+```bash
+cd terraform
+cp gitlab_http_backend_cred.sh.example gitlab_http_backend_cred.sh
+# edit URL, PROJECT_ID, username, PAT (scope: api)
+source ./gitlab_http_backend_cred.sh
+terraform init -migrate-state
+```
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+Confirm in GitLab UI: **Operate → Terraform states** (state name `homelab`).
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+If GitLab uses a private CA: `export SSL_CERT_FILE=/path/to/ca.pem` before `init`.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+### 3. CI/CD variables (Settings → CI/CD → Variables)
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+| Variable | Type | Protected | Notes |
+|----------|------|-----------|--------|
+| `TF_VARS_FILE` | File | yes | Full `terraform.tfvars` for the runner; see `terraform/terraform.tfvars.ci.example` |
+| `SSH_PUBLIC_KEY` | File | yes | Public key → `/tmp/tf-ci-keys/id.pub` |
+| `SSH_PRIVATE_KEY` | File | yes | Private key (needed if `local_path` image upload / inventory SSH path) |
+| `GITLAB_CA_CERT` | File | optional | Homelab CA if API HTTPS is self-signed |
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+`CI_JOB_TOKEN` is used automatically for state auth (no PAT in CI).
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+Runner must reach **Proxmox API** and (for module download) **GitHub** + Terraform registry.
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+### 4. Pipeline behaviour
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+| Job | When | Action |
+|-----|------|--------|
+| `terraform:fmt` | MR + default branch | `terraform fmt -check` |
+| `terraform:validate` | MR + default branch | `init` + `validate` |
+| `terraform:plan` | MR + default branch | `plan` artifact (`tfplan`, `tfplan.txt`) |
+| `terraform:apply` | default branch only | **manual** apply of the plan artifact |
 
-## License
-For open source projects, say how it is licensed.
+### 5. Images in CI
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+Prefer `url=` for cloud images in `TF_VARS_FILE` so the runner does not need a local `.img`. Switching `local_path` ↔ `url` for an existing image may require state surgery — do it carefully on a laptop first.
+
+More Terraform detail: [`terraform/README.md`](terraform/README.md).

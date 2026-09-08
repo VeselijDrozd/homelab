@@ -1,0 +1,29 @@
+# Copy to gitlab_http_backend_cred.sh (gitignored) and fill in real values:
+#   cp gitlab_http_backend_cred.sh.example gitlab_http_backend_cred.sh
+#   source ./gitlab_http_backend_cred.sh
+#
+# Then migrate (once) or re-init:
+#   terraform init -migrate-state
+#   # or: terraform init -reconfigure
+#
+# Create a GitLab Personal Access Token with scope `api`.
+# PROJECT_ID: GitLab → project → Settings → General → Project ID.
+# STATE_NAME: arbitrary label for this state (e.g. homelab).
+
+export GITLAB_URL="http://gitlab.homelab.local"
+export GITLAB_PROJECT_ID="3"
+export GITLAB_USERNAME="CHANGE_ME_GITLAB_USERNAME"
+export GITLAB_PAT="CHANGE_ME_PERSONAL_ACCESS_TOKEN"
+export TF_STATE_NAME="homelab"
+
+export TF_HTTP_ADDRESS="${GITLAB_URL}/api/v4/projects/${GITLAB_PROJECT_ID}/terraform/state/${TF_STATE_NAME}"
+export TF_HTTP_LOCK_ADDRESS="${TF_HTTP_ADDRESS}/lock"
+export TF_HTTP_UNLOCK_ADDRESS="${TF_HTTP_ADDRESS}/lock"
+export TF_HTTP_USERNAME="${GITLAB_USERNAME}"
+export TF_HTTP_PASSWORD="${GITLAB_PAT}"
+export TF_HTTP_LOCK_METHOD="POST"
+export TF_HTTP_UNLOCK_METHOD="DELETE"
+export TF_HTTP_RETRY_WAIT_MIN="5"
+
+# If GitLab uses a private CA, point Terraform/Go at it:
+# export SSL_CERT_FILE="/path/to/homelab-ca.pem"

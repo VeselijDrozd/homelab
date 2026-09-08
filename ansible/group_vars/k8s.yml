@@ -1,0 +1,8 @@
+kubernetes_version: "1.31"
+kubernetes_apt_key_url: "https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key"
+kubernetes_apt_repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /"
+
+pod_network_cidr: "10.244.0.0/16"
+flannel_manifest_url: "https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml"
+
+kubeadm_init_opts: ""

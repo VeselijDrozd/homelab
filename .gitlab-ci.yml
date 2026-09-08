@@ -1,0 +1,103 @@
+# Homelab infra CI — Phase 1 (fmt/validate/plan) + Phase 2 (manual apply).
+# Requires GitLab CI/CD variables — see README.md → "GitLab CI / remote state".
+
+stages:
+  - validate
+  - plan
+  - apply
+
+variables:
+  TF_DIR: terraform
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  TF_STATE_NAME: homelab
+  TF_IMAGE: hashicorp/terraform:1.14
+
+default:
+  image:
+    name: $TF_IMAGE
+    entrypoint: [""]
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+terraform:fmt:
+  stage: validate
+  script:
+    - cd "$TF_DIR"
+    - terraform fmt -check -recursive -diff
+
+terraform:validate:
+  stage: validate
+  cache:
+    key:
+      files:
+        - terraform/.terraform.lock.hcl
+    paths:
+      - terraform/.terraform/
+  before_script:
+    - chmod +x terraform/ci/setup.sh
+    - . terraform/ci/setup.sh
+  script:
+    - cd "$TF_DIR"
+    - terraform validate
+  needs:
+    - terraform:fmt
+
+terraform:plan:
+  stage: plan
+  cache:
+    key:
+      files:
+        - terraform/.terraform.lock.hcl
+    paths:
+      - terraform/.terraform/
+  before_script:
+    - chmod +x terraform/ci/setup.sh
+    - . terraform/ci/setup.sh
+  script:
+    - cd "$TF_DIR"
+    - terraform plan -input=false -out=tfplan
+    - terraform show -no-color tfplan > tfplan.txt
+  artifacts:
+    name: tfplan-$CI_COMMIT_SHORT_SHA
+    paths:
+      - terraform/tfplan
+      - terraform/tfplan.txt
+    expire_in: 7 days
+    when: always
+  needs:
+    - terraform:validate
+
+terraform:apply:
+  stage: apply
+  resource_group: terraform-homelab
+  cache:
+    key:
+      files:
+        - terraform/.terraform.lock.hcl
+    paths:
+      - terraform/.terraform/
+  before_script:
+    - chmod +x terraform/ci/setup.sh
+    - . terraform/ci/setup.sh
+  script:
+    - cd "$TF_DIR"
+    - terraform apply -input=false -auto-approve tfplan
+  artifacts:
+    name: inventory-$CI_COMMIT_SHORT_SHA
+    paths:
+      - ansible/inventory.ini
+    expire_in: 30 days
+    when: on_success
+  needs:
+    - job: terraform:plan
+      artifacts: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: false
+  environment:
+    name: homelab/proxmox

@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: surfhouse
+  namespace: website
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: surfhouse
+  template:
+    metadata:
+      labels:
+        app: surfhouse
+    spec:
+      containers:
+        - name: surfhouse
+          image: gitlab.homelab.local:5050/homelab/surfhouse:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
