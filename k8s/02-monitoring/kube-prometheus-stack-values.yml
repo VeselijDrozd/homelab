@@ -1,0 +1,116 @@
+# --- Grafana ---
+# Admin password is NOT stored here. Pass it via a local secrets overlay:
+#   helm upgrade --install ... -f kube-prometheus-stack-values.yml \
+#     -f kube-prometheus-stack-secrets.yml
+# See kube-prometheus-stack-secrets.yml.example
+grafana:
+  initChownData:
+    enabled: false
+  securityContext:
+    fsGroup: 472
+  enabled: true
+
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClassName: local-path
+
+  service:
+    type: ClusterIP
+
+  # Datasource Prometheus chart подключает сам
+  defaultDashboardsEnabled: true
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# --- Prometheus ---
+prometheus:
+  enabled: true
+  prometheusSpec:
+    retention: 15d
+    retentionSize: 12GB
+
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 15Gi
+
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: 2Gi
+        
+    scrapeInterval: 30s
+
+# --- Alertmanager ---
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 2Gi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# --- Агенты  ---
+nodeExporter:
+  enabled: true
+
+kubeStateMetrics:
+  enabled: true
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# --- Дефолтные алерты (много шума на homelab — можно урезать) ---
+defaultRules:
+  create: true
+  rules:
+    alertmanager: true
+    etcd: false          # на kubeadm etcd часто недоступен для scrape
+    kubeApiserverAvailability: true
+    kubeApiserverBurnrate: false
+    kubeApiserverHistogram: false
+    kubeApiserverSlos: false
+    kubeControllerManager: false
+    kubeSchedulerAlerting: false
+    kubeSchedulerRecording: false
+    kubeProxy: false
+    kubernetesApps: true
+    kubernetesResources: true
+    kubernetesStorage: true
+    kubernetesSystem: true
+    network: true
+    node: true
+    prometheus: true

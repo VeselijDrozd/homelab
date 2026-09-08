@@ -1,0 +1,53 @@
+endpoint         = "https://192.168.1.100:8006"
+proxmox_username = "root@pam"
+main_password    = "CHANGE_ME_PROXMOX_PASSWORD"
+vm_pass          = "CHANGE_ME_VM_PASSWORD"
+pc_public_key_path = "/home/user/.ssh/id_ed25519.pub"
+
+# Optional: LAN prefix for vm_ipv4_addresses output (default 10.10.10.)
+# vm_output_ipv4_prefix = "192.168.1."
+
+# Ansible inventory (generated after apply)
+# ansible_inventory_path       = "../ansible/inventory.ini"
+# ansible_ssh_private_key_file = "/home/user/.ssh/id_ed25519"
+#
+# ansible_inventory_hierarchy = {
+#   homelab = ["k8s", "gitlab"]
+#   k8s     = ["k8s_master", "k8s_worker"]
+#   gitlab  = ["gitlab_server", "gitlab_runner"]
+# }
+
+# Required when any image uses local_path (upload uses SSH on the Proxmox node).
+proxmox_ssh_private_key_path = "/home/user/.ssh/id_ed25519"
+proxmox_ssh_username         = "root"
+
+images = {
+  ubuntu_jammy = {
+    datastore_id = "local"
+    node_name    = "pve"
+    # Either url (Proxmox downloads) or local_path (upload from machine running Terraform):
+    # url        = "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
+    # file_name  = "jammy-server-cloudimg-amd64.qcow2"
+    local_path = "/home/user/images/jammy-with-qemu-agent.img"
+    file_name  = "jammy-with-qemu-agent.qcow2"
+  }
+}
+
+vm_groups = {
+  app = {
+    count       = 3
+    vm_id_start = 4301
+    name_prefix = "app-vm"
+    config = {
+      image_key                   = "ubuntu_jammy"
+      node_name                   = "pve"
+      agent_enabled               = true
+      tags                        = ["terraform", "ubuntu", "app"]
+      disk_datastore_id           = "local-zfs"
+      initialization_datastore_id = "local-zfs"
+      bridge                      = "vmbr0"
+    }
+  }
+}
+
+vms = {}

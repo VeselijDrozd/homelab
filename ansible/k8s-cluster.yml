@@ -1,0 +1,21 @@
+---
+# Kubernetes cluster via kubeadm
+# Usage: ansible-playbook k8s-cluster.yml
+
+- name: Prepare all Kubernetes nodes
+  hosts: k8s
+  gather_facts: true
+  roles:
+    - k8s_node
+
+- name: Initialize control plane on master
+  hosts: k8s_master
+  gather_facts: true
+  roles:
+    - k8s_control_plane
+
+- name: Join worker nodes to the cluster
+  hosts: k8s_worker
+  gather_facts: true
+  roles:
+    - k8s_worker_node

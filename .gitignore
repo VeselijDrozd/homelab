@@ -1,0 +1,35 @@
+# --- Secrets & local overrides (never commit) ---
+**/*secrets*.yml
+!**/*secrets*.yml.example
+**/*secret*.yaml
+!**/*secret*.yaml.example
+*.tfvars
+*.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
+s3_*cred*.sh
+!s3_*cred*.sh.example
+.env
+.env.*
+!.env.example
+
+# --- Terraform ---
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# --- Ansible ---
+ansible/inventory.ini
+
+# --- Editor / OS ---
+.idea/
+.vscode/
+*.swp
+.DS_Store
