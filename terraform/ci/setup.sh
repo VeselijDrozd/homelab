@@ -8,8 +8,15 @@ KEYS_DIR="${KEYS_DIR:-/tmp/tf-ci-keys}"
 STATE_NAME="${TF_STATE_NAME:-homelab}"
 ROOT_DIR="${CI_PROJECT_DIR:-$(pwd)}"
 
-# Prefer Yandex network mirror when HashiCorp registry is geo-blocked (RU/etc.).
-export TF_CLI_CONFIG_FILE="${TF_CLI_CONFIG_FILE:-${ROOT_DIR}/terraform/ci/terraformrc}"
+# Always use the in-repo CLI config (Yandex provider mirror). Do not rely on
+# YAML ${CI_PROJECT_DIR} expansion inside the job container.
+TF_CLI_CONFIG_FILE="${ROOT_DIR}/terraform/ci/terraformrc"
+export TF_CLI_CONFIG_FILE
+if [ ! -f "${TF_CLI_CONFIG_FILE}" ]; then
+  echo "ERROR: missing ${TF_CLI_CONFIG_FILE}" >&2
+  exit 1
+fi
+echo "Using TF_CLI_CONFIG_FILE=${TF_CLI_CONFIG_FILE}"
 
 mkdir -p "${KEYS_DIR}"
 cd "${ROOT_DIR}"
