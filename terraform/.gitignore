@@ -26,7 +26,6 @@ inventory.ini
 *.auto.tfvars.json
 
 # Sensitive project files (local only; use *.example templates)
-s3_backet_cred.sh
 s3_backend_cred.sh
 gitlab_http_backend_cred.sh
 *secrets*.yml

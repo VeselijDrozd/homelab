@@ -16,8 +16,7 @@ homelab/
 ├── .gitlab-ci.yml   # Terraform fmt → validate → plan → manual apply
 ├── terraform/       # Proxmox VMs + remote state (GitLab HTTP backend)
 ├── ansible/         # kubeadm cluster bootstrap
-├── k8s/             # manifests & Helm values (website, monitoring, …)
-└── gitlab/          # notes / related deploy experiments
+└── k8s/             # manifests & Helm values (website, monitoring, …)
 ```
 
 Related repos:
