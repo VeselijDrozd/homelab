@@ -1,0 +1,41 @@
+#cloud-config
+# Example user-data for homework Assignment 2 (+ security ports from Assignment 1).
+# Analogue of Yandex Cloud security groups (22/80/443) + Docker / Docker Compose install.
+#
+# How to use (demo VM only — do NOT apply to existing kubeadm nodes):
+# 1. Upload this file to a Proxmox snippets datastore, or pass via Terraform
+#    proxmox_virtual_environment_file (content_type = "snippets") +
+#    initialization.user_data_file_id on a dedicated VM.
+# 2. Or: cloud-init seed / manual paste when creating a one-off lab VM.
+#
+# Production homelab k8s nodes use containerd via Ansible instead of Docker.
+
+package_update: true
+package_upgrade: false
+
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - ufw
+  - docker.io
+  - docker-compose-v2
+
+groups:
+  - docker
+
+system_info:
+  default_user:
+    groups: [docker]
+
+runcmd:
+  # Security group analogue: allow SSH + HTTP + HTTPS
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow 22/tcp
+  - ufw allow 80/tcp
+  - ufw allow 443/tcp
+  - ufw --force enable
+  - systemctl enable --now docker
+  - docker --version
+  - docker compose version

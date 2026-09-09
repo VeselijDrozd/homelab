@@ -44,6 +44,8 @@ Do not commit real passwords. Use:
 - `terraform/s3_backend_cred.sh` (gitignored) from `s3_backend_cred.sh.example` (optional MinIO)
 - `k8s/02-monitoring/kube-prometheus-stack-secrets.yml` (gitignored) from `*.example`
 
+Homework demos (cloud-init Docker/Compose + UFW ports): [`terraform/examples/`](terraform/examples/).
+
 ---
 
 ## GitLab CI / remote state

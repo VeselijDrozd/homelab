@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: surfhouse-api
+  namespace: website
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: surfhouse-api
+  template:
+    metadata:
+      labels:
+        app: surfhouse-api
+    spec:
+      imagePullSecrets:
+        - name: gitlab-registry
+      containers:
+        - name: surfhouse-api
+          image: gitlab.homelab.local:5050/homelab/surfhouse/api:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DB_HOST
+              value: mariadb
+            - name: DB_PORT
+              value: "3306"
+            - name: DB_USER
+              value: surfhouse
+            - name: DB_NAME
+              value: surfhouse
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: surfhouse-db
+                  key: password
+            - name: PORT
+              value: "8080"
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: surfhouse-api
+  namespace: website
+spec:
+  type: ClusterIP
+  selector:
+    app: surfhouse-api
+  ports:
+    - port: 80
+      targetPort: 8080
