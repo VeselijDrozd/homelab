@@ -8,6 +8,9 @@ KEYS_DIR="${KEYS_DIR:-/tmp/tf-ci-keys}"
 STATE_NAME="${TF_STATE_NAME:-homelab}"
 ROOT_DIR="${CI_PROJECT_DIR:-$(pwd)}"
 
+# Prefer Yandex network mirror when HashiCorp registry is geo-blocked (RU/etc.).
+export TF_CLI_CONFIG_FILE="${TF_CLI_CONFIG_FILE:-${ROOT_DIR}/terraform/ci/terraformrc}"
+
 mkdir -p "${KEYS_DIR}"
 cd "${ROOT_DIR}"
 

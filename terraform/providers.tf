@@ -1,11 +1,15 @@
 # https://registry.terraform.io/providers/bpg/proxmox/latest/docs
 terraform {
   required_providers {
+    # Sources are unchanged (still registry.terraform.io/…).
+    # In CI, downloads go via Yandex mirror — see terraform/ci/terraformrc.
     proxmox = {
-      source = "bpg/proxmox"
+      source  = "bpg/proxmox"
+      version = "~> 0.106"
     }
     local = {
-      source = "hashicorp/local"
+      source  = "hashicorp/local"
+      version = "~> 2.9"
     }
   }
 }

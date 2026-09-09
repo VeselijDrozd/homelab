@@ -90,7 +90,11 @@ If GitLab uses a private CA: `export SSL_CERT_FILE=/path/to/ca.pem` before `init
 
 `CI_JOB_TOKEN` is used automatically for state auth (no PAT in CI).
 
-Runner must reach **Proxmox API** and (for module download) **GitHub** + Terraform registry.
+Runner must reach **Proxmox API**, **GitHub** (module source), and a Terraform
+provider mirror. Official `registry.terraform.io` is often **geo-blocked**; CI
+uses `terraform/ci/terraformrc` → `https://terraform-mirror.yandexcloud.net/`.
+Locally you can `export TF_CLI_CONFIG_FILE=$PWD/terraform/ci/terraformrc` before
+`terraform init` if you hit the same error.
 
 ### 4. Pipeline behaviour
 

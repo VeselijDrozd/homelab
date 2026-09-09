@@ -12,6 +12,8 @@ variables:
   TF_INPUT: "false"
   TF_STATE_NAME: homelab
   TF_IMAGE: hashicorp/terraform:1.14
+  # Provider downloads via Yandex mirror (HashiCorp registry geo-block).
+  TF_CLI_CONFIG_FILE: "${CI_PROJECT_DIR}/terraform/ci/terraformrc"
 
 default:
   image:
