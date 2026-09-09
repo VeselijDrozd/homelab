@@ -1,111 +1,147 @@
 # Homelab infrastructure
 
-IaC for a Proxmox-based home lab: VMs → Ansible inventory → Kubernetes → platform apps.
+IaC for a Proxmox-based home lab:
 
-Hosting:
+**Terraform (VMs) → Ansible (kubeadm) → Kubernetes apps (website, monitoring)**
 
-| Remote | Role |
-|--------|------|
-| GitHub (`VeselijDrozd/homelab`) | public mirror / history |
-| GitLab (homelab) | **source of truth for CI** + Managed Terraform State |
+| Remote | URL / role |
+|--------|------------|
+| **GitLab** | `homelab/homelab` — CI + Managed Terraform State (primary) |
+| **GitHub** | [VeselijDrozd/homelab](https://github.com/VeselijDrozd/homelab) — public mirror |
+
+Default branch: **`main`**.
 
 ## Layout
 
 ```
 homelab/
-├── .gitlab-ci.yml   # Terraform fmt → validate → plan → manual apply
-├── terraform/       # Proxmox VMs + remote state (GitLab HTTP backend)
-├── ansible/         # kubeadm cluster bootstrap
-└── k8s/             # manifests & Helm values (website, monitoring, …)
+├── .gitlab-ci.yml
+├── terraform/
+│   ├── backend.tf              # GitLab HTTP remote state
+│   ├── main.tf                 # images + VM module (git ref v1.1.2)
+│   ├── ci/
+│   │   ├── setup.sh            # CI init, secrets, TF_HTTP_*, mirror
+│   │   └── terraformrc         # Yandex provider mirror (geo-block workaround)
+│   ├── examples/               # homework: cloud-init Docker/Compose + UFW
+│   ├── gitlab_http_backend_cred.sh.example
+│   ├── terraform.tfvars.example
+│   └── terraform.tfvars.ci.example
+├── ansible/                    # kubeadm cluster bootstrap
+└── k8s/
+    ├── 00-prereqisites/        # ingress-nginx values, …
+    ├── 01-website/             # static site + MariaDB/API manifests (copies)
+    └── 02-monitoring/          # kube-prometheus-stack + Grafana ingress
 ```
 
 Related repos:
 
 | Path | Hosting | Role |
 |------|---------|------|
-| `../terraform-proxmox-vm-module` | GitHub (public) | Reusable Terraform VM module (also pulled by git ref in CI) |
-| `../surfhouse` | GitLab (homelab) | Sample app + deploy CI |
+| [`terraform-proxmox-vm-module`](https://github.com/VeselijDrozd/terraform-proxmox-vm-module) | GitHub | Reusable Proxmox VM module |
+| `surfhouse` | GitLab `homelab/surfhouse` | Landing + Flask API + MariaDB deploy CI |
 
-## Suggested order
+Canonical website/API/DB manifests for CI live in **surfhouse** (`surfhouse/k8s/`).  
+`k8s/01-website/` keeps copies for manual apply from this repo — see [`k8s/01-website/README.md`](k8s/01-website/README.md).
 
-1. Prepare cloud image with qemu-guest-agent.
-2. `cd terraform && cp terraform.tfvars.example terraform.tfvars` → fill secrets → `terraform apply`.
-3. Inventory is written to `ansible/inventory.ini`.
-4. `cd ../ansible && ansible-playbook k8s-cluster.yml`.
-5. Deploy platform pieces from `k8s/` (Ingress, local-path, apps, monitoring).
+## Quick start (laptop)
 
-## Secrets
+1. Cloud image with qemu-guest-agent on Proxmox (or let Terraform download via `url=`).
+2. Terraform:
+   ```bash
+   cd terraform
+   cp terraform.tfvars.example terraform.tfvars   # fill secrets
+   cp gitlab_http_backend_cred.sh.example gitlab_http_backend_cred.sh
+   source ./gitlab_http_backend_cred.sh           # GitLab state
+   # if registry.terraform.io is geo-blocked:
+   export TF_CLI_CONFIG_FILE=$PWD/ci/terraformrc
+   terraform init
+   terraform plan
+   terraform apply
+   ```
+3. Inventory: `ansible/inventory.ini` (generated).
+4. Cluster: `cd ../ansible && ansible-playbook k8s-cluster.yml`.
+5. Platform: apply/Helm from `k8s/` (Ingress, local-path, website, monitoring).
+6. App CI: push/build in **surfhouse** (Registry + deploy to `website` namespace).
 
-Do not commit real passwords. Use:
+More Terraform detail: [`terraform/README.md`](terraform/README.md).
 
-- `terraform/terraform.tfvars` (gitignored) from `terraform.tfvars.example`
-- `terraform/gitlab_http_backend_cred.sh` (gitignored) from `gitlab_http_backend_cred.sh.example`
-- `terraform/s3_backend_cred.sh` (gitignored) from `s3_backend_cred.sh.example` (optional MinIO)
-- `k8s/02-monitoring/kube-prometheus-stack-secrets.yml` (gitignored) from `*.example`
+## Secrets (never commit)
 
-Homework demos (cloud-init Docker/Compose + UFW ports): [`terraform/examples/`](terraform/examples/).
+| File / variable | Purpose |
+|-----------------|--------|
+| `terraform/terraform.tfvars` | Proxmox + VM definitions (from `*.example`) |
+| `terraform/gitlab_http_backend_cred.sh` | PAT for local state access |
+| `terraform/s3_backend_cred.sh` | Optional MinIO backend (from `*.example`) |
+| `k8s/02-monitoring/*secrets*.yml` | Grafana admin password overlay |
+| GitLab CI File vars | See below |
+
+Homework demos (user-data Docker/Compose + ports 22/80/443): [`terraform/examples/`](terraform/examples/).
 
 ---
 
-## GitLab CI / remote state
+## GitLab Managed State
 
-Phases 1–2: **Managed Terraform State** + pipeline `fmt` → `validate` → `plan` → **manual** `apply`.
+- Backend: `backend "http"` → project **ID 3** / state name **`homelab`** (adjust in cred script if needed).
+- UI: **Operate → Terraform states**.
+- Local: `source gitlab_http_backend_cred.sh` then `terraform init`  
+  (`GITLAB_URL=http://gitlab.homelab.local`, PAT with scope `api`).
 
-### 1. Create GitLab project
-
-Create an empty project (e.g. `homelab/homelab` or `homelab/infra`). Note the numeric **Project ID**.
-
-Add GitLab remote (keep GitHub if you want):
-
-```bash
-cd /path/to/homelab
-git remote add gitlab git@gitlab.homelab.local:GROUP/homelab.git
-# first push after commit:
-git push -u gitlab master
-```
-
-### 2. Migrate local state → GitLab (once, from your laptop)
+First-time migration from an old local state (already done in this lab):
 
 ```bash
-cd terraform
-cp gitlab_http_backend_cred.sh.example gitlab_http_backend_cred.sh
-# edit URL, PROJECT_ID, username, PAT (scope: api)
 source ./gitlab_http_backend_cred.sh
 terraform init -migrate-state
 ```
 
-Confirm in GitLab UI: **Operate → Terraform states** (state name `homelab`).
+---
 
-If GitLab uses a private CA: `export SSL_CERT_FILE=/path/to/ca.pem` before `init`.
+## GitLab CI (Terraform)
 
-### 3. CI/CD variables (Settings → CI/CD → Variables)
+Pipeline: **`fmt` → `validate` → `plan` → manual `apply`**.
 
-| Variable | Type | Protected | Notes |
-|----------|------|-----------|--------|
-| `TF_VARS_FILE` | File | yes | Full `terraform.tfvars` for the runner; see `terraform/terraform.tfvars.ci.example` |
-| `SSH_PUBLIC_KEY` | File | yes | Public key → `/tmp/tf-ci-keys/id.pub` |
-| `SSH_PRIVATE_KEY` | File | yes | Private key (needed if `local_path` image upload / inventory SSH path) |
-| `GITLAB_CA_CERT` | File | optional | Homelab CA if API HTTPS is self-signed |
+### CI/CD variables
 
-`CI_JOB_TOKEN` is used automatically for state auth (no PAT in CI).
+| Variable | Type | Notes |
+|----------|------|--------|
+| `TF_VARS_FILE` | **File** (not Masked) | Full tfvars; CI key paths `/tmp/tf-ci-keys/…` — see `terraform.tfvars.ci.example` |
+| `SSH_PUBLIC_KEY` | **File** | → `/tmp/tf-ci-keys/id.pub` |
+| `SSH_PRIVATE_KEY` | **File** | → `/tmp/tf-ci-keys/id` |
+| `GITLAB_CA_CERT` | File, optional | Only if GitLab HTTPS uses a private CA |
 
-Runner must reach **Proxmox API**, **GitHub** (module source), and a Terraform
-provider mirror. Official `registry.terraform.io` is often **geo-blocked**; CI
-uses `terraform/ci/terraformrc` → `https://terraform-mirror.yandexcloud.net/`.
-Locally you can `export TF_CLI_CONFIG_FILE=$PWD/terraform/ci/terraformrc` before
-`terraform init` if you hit the same error.
+Type must be **File**: with type Variable, `setup.sh` treats the value as a path and `cp` fails.
 
-### 4. Pipeline behaviour
+State in CI uses `CI_JOB_TOKEN` (no PAT in the pipeline).
+
+### Runner requirements
+
+- Reach Proxmox API (`https://…:8006`)
+- Reach GitHub (module `git::https://github.com/…`)
+- Provider installs via **Yandex mirror** (`terraform/ci/terraformrc`) — official `registry.terraform.io` is often geo-blocked (RU)
+
+### Jobs
 
 | Job | When | Action |
 |-----|------|--------|
-| `terraform:fmt` | MR + default branch | `terraform fmt -check` |
-| `terraform:validate` | MR + default branch | `init` + `validate` |
-| `terraform:plan` | MR + default branch | `plan` artifact (`tfplan`, `tfplan.txt`) |
-| `terraform:apply` | default branch only | **manual** apply of the plan artifact |
+| `terraform:fmt` | MR + `main` | `fmt -check` |
+| `terraform:validate` | MR + `main` | `init` + `validate` |
+| `terraform:plan` | MR + `main` | plan artifact |
+| `terraform:apply` | `main` only | **manual** apply |
 
-### 5. Images in CI
+`apply` stays **Blocked/manual** until you press ▶ — intentional.
 
-Prefer `url=` for cloud images in `TF_VARS_FILE` so the runner does not need a local `.img`. Switching `local_path` ↔ `url` for an existing image may require state surgery — do it carefully on a laptop first.
+### Images in CI tfvars
 
-More Terraform detail: [`terraform/README.md`](terraform/README.md).
+Prefer `url=` for cloud images so the runner does not need a local `.img`.  
+Switching `local_path` ↔ `url` in an existing state can rewrite image resources — review the plan carefully.
+
+---
+
+## Kubernetes apps (overview)
+
+| Stack | Namespace / path | Notes |
+|-------|------------------|--------|
+| Website | `website` / `k8s/01-website` | nginx static; API + MariaDB deployed mainly via **surfhouse** CI |
+| Monitoring | `monitoring` / `k8s/02-monitoring` | kube-prometheus-stack, Grafana `grafana.local` |
+
+Surfhouse public URLs (typical): `http://surfhouse.local/` and `http://surfhouse.local/api/hits`  
+(DB password: GitLab Variable `DB_PASSWORD` in the **surfhouse** project → Secret `surfhouse-db`).
